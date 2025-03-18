@@ -11,7 +11,7 @@
     npt            = 24
     ndtd           = 1
     runtype        = 'initial'
-    ice_ic         = './restart/iced_gx3_v5.nc'
+    ice_ic         = './Github/cice-dev/restart/iced_gx3_v5.nc'
     restart_ext    = .false.
     use_restart_time = .false.
     restart_format = 'default'
@@ -24,9 +24,9 @@
     lcdf64         = .false.
     numin          = 21
     numax          = 89
-    restart_dir    = './restart/'
+    restart_dir    = './Github/cice-dev/restart/'
     restart_file   = 'iced'
-    pointer_file   = './ice.restart_file'
+    pointer_file   = './Github/cice-dev/ice.restart_file'
     dumpfreq       = 'd','x','x','x','x'
     dumpfreq_n     =  1 , 1 , 1 , 1 , 1
     dumpfreq_base  = 'init','init','init','init','init'
@@ -56,7 +56,7 @@
     histfreq_base  = 'zero','zero','zero','zero','zero'
     hist_avg       = .true.,.true.,.true.,.true.,.true.
     hist_suffix    = 'x','x','x','x','x'
-    history_dir    = './history/'
+    history_dir    = './Github/cice-dev/history/'
     history_file   = 'iceh'
     history_precision = 4
     history_format = 'default'
@@ -68,7 +68,7 @@
     history_chunksize = 0, 0
     hist_time_axis = 'end'
     write_ic       = .true.
-    incond_dir     = './history/'
+    incond_dir     = './Github/cice-dev/history/'
     incond_file    = 'iceh_ic'
     version_name   = 'undefined_version_name'
 /
