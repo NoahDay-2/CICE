@@ -27,7 +27,7 @@
     restart_dir    = './restart/'
     restart_file   = 'iced'
     pointer_file   = './ice.restart_file'
-    dumpfreq       = 'd','x','x','x','x'
+    dumpfreq       = 'm','x','x','x','x'
     dumpfreq_n     =  1 , 1 , 1 , 1 , 1
     dumpfreq_base  = 'init','init','init','init','init'
     dump_last      = .false.
