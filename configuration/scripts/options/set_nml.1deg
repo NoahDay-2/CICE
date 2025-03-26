@@ -1,0 +1,23 @@
+dt = 3600.0
+runtype = 'initial'
+year_init      = 2019
+use_leap_years = .false.
+use_restart_time = .false.
+
+
+ice_ic  = 'default'
+grid_format = 'nc'
+grid_type   = 'displaced_pole'
+grid_file   = 'ICE_MACHINE_INPUTDATA/CICE_data/grid/access-om3/cice/grids/global.1deg/2024.05.14/grid.nc'
+kmt_file    = 'ICE_MACHINE_INPUTDATA/CICE_data/grid/access-om3/cice/grids/global.1deg/2024.05.14/kmt.nc'
+bathymetry_file = 'ICE_MACHINE_INPUTDATA/CICE_data/grid/gx3/global_gx3.bathy.nc'
+fyear_init      = 2005
+atm_data_format = 'nc'
+atm_data_type   = 'default'
+
+
+nx_global         = 360
+ny_global         = 300
+block_size_x      = 90
+block_size_y      = 75
+nilyr        = 4
