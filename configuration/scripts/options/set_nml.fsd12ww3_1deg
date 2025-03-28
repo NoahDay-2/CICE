@@ -2,4 +2,4 @@ tr_fsd = .true.
 nfsd = 12
 wave_spec_type = 'constant'
 nfreq = 31
-wave_spec_file  = '/Users/noahday/GitHub/cice-dev/cice-dirs/input/CICE_data/forcing/access-om2_1deg/cice6-wim/cice6-wim_bretschneider_spec_2019-01-01.nc'
+wave_spec_file  = 'ICE_MACHINE_INPUTDATA/CICE_data/forcing/access-om2_1deg/cice6-wim/cice6-wim_bretschneider_spec_2019-01-01.nc'

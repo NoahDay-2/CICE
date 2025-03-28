@@ -192,7 +192,7 @@
          mixed_layer_depth_default = c20  ! default mixed layer depth in m
 
       logical (kind=log_kind), parameter :: &
-         local_debug = .false.   ! local debug flag
+         local_debug = .true.   ! local debug flag
 
 !=======================================================================
 
@@ -5473,7 +5473,7 @@
       logical (kind=log_kind) :: wave_spec
       character(len=*), parameter :: subname = '(wave_spec_data)'
 
-      debug_n_d = .false.  !usually false
+      debug_n_d = .true.  !usually false
 
       call icepack_query_parameters(secday_out=secday)
       call icepack_warnings_flush(nu_diag)
@@ -5487,6 +5487,7 @@
 
       !spec_file = trim(ocn_data_dir)//'/'//trim(wave_spec_file)
       spec_file = trim(wave_spec_file)
+      if (local_debug .and. my_task == master_task) write(nu_diag,*) subname, 'wave_spec_file', spec_file
       wave_spectrum_data = c0
       wave_spectrum = c0
       yr = fyear  ! current year
@@ -5506,7 +5507,7 @@
       maxrec = days_per_year*4
 
       if(days_per_year == 365 .and. (mod(yr,  4) == 0)) then
-      call abort_ice('days_per_year should be set to 366 for leap years')
+         call abort_ice('days_per_year should be set to 366 for leap years')
       end if
 
       ! current record number
@@ -5533,8 +5534,9 @@
          ! file variable names are:
          ! efreq   (wave spectrum, energy as a function of wave frequency UNITS)
          !-------------------------------------------------------------------
+         if (local_debug .and. my_task == master_task) write(nu_diag,*) subname, 'ice_open_nc'
          call ice_open_nc(spec_file,ncid)
-
+         if (local_debug .and. my_task == master_task) write(nu_diag,*) subname, 'ice_read_nc_xyf'
          call ice_read_nc_xyf(ncid,recnum,'efreq',wave_spectrum_data(:,:,:,1,:),debug_n_d, &
               field_loc=field_loc_center, &
               field_type=field_type_scalar)
