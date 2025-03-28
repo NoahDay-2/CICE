@@ -128,6 +128,44 @@ else if (${grid} == '1deg') then
     set blckx = 10; set blcky = 12
   endif
 
+else if (${grid} == 'gadi1deg') then
+  set nxglob = 360
+  set nyglob = 300
+  if (${cicepes} <= 16) then
+    set blckx = 90; set blcky = 75
+  else if (${cicepes} <= 20) then
+    set blckx = 32; set blcky = 48
+  else if (${cicepes} <= 32) then
+    set blckx = 20; set blcky = 24
+  else if (${cicepes} <= 40) then
+    set blckx = 16; set blcky = 24
+  else if (${cicepes} < 80) then
+    set blckx = 10; set blcky = 16
+  else if (${cicepes} == 80) then
+    set blckx = 8;  set blcky = 16
+  else
+    set blckx = 10; set blcky = 12
+  endif
+
+else if (${grid} == 'gadi025deg') then
+  set nxglob = 1440
+  set nyglob = 1080
+  if (${cicepes} <= 16) then
+    set blckx = 90; set blcky = 75
+  else if (${cicepes} <= 20) then
+    set blckx = 32; set blcky = 48
+  else if (${cicepes} <= 32) then
+    set blckx = 20; set blcky = 24
+  else if (${cicepes} <= 40) then
+    set blckx = 16; set blcky = 24
+  else if (${cicepes} < 80) then
+    set blckx = 10; set blcky = 16
+  else if (${cicepes} == 80) then
+    set blckx = 8;  set blcky = 16
+  else
+    set blckx = 10; set blcky = 12
+  endif
+
 else if (${grid} == 'tx1') then
   set nxglob = 360
   set nyglob = 240

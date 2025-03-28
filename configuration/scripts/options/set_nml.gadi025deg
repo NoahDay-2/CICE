@@ -1,0 +1,22 @@
+dt = 3600.0
+runtype = 'initial'
+year_init      = 1900
+use_leap_years = .false.
+use_restart_time = .false.
+
+
+ice_ic  = '/g/data/vk83/configurations/inputs/access-om3/cice/initial_conditions/global.025deg/2024.04.09/iced.1900-01-01-10800.nc'
+grid_format = 'nc'
+grid_type   = 'displaced_pole'
+grid_file   = '/g/data/vk83/configurations/inputs/access-om3/cice/grids/global.025deg/2024.05.14/grid.nc'
+kmt_file    = '/g/data/vk83/configurations/inputs/access-om3/cice/grids/global.025deg/2024.05.14/kmt.nc'
+bathymetry_file = '/g/data/vk83/configurations/inputs/access-om3/share/grids/global.025deg/2023.05.15/topog.nc'
+atm_data_format = 'nc'
+atm_data_type   = 'default'
+
+
+nx_global         = 1440
+ny_global         = 1080
+block_size_x      = 90
+block_size_y      = 75
+nilyr        = 4
