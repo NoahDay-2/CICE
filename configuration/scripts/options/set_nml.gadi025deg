@@ -14,7 +14,7 @@ bathymetry_file = '/g/data/vk83/configurations/inputs/access-om3/share/grids/glo
 atm_data_format = 'nc'
 atm_data_type   = 'default'
 
-
+nprocs            = 48
 nx_global         = 1440
 ny_global         = 1080
 block_size_x      = 90
