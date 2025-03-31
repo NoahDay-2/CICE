@@ -18,5 +18,5 @@ atm_data_type   = 'default'
 nx_global         = 1440
 ny_global         = 1080
 block_size_x      = 90
-block_size_y      = 75
+block_size_y      = 60
 nilyr        = 4
