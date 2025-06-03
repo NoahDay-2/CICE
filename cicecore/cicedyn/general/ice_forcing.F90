@@ -2240,6 +2240,8 @@
          grd = 'gx3'
       else if (index(trim(atm_data_dir),'tx1') > 0) then
          grd = 'tx1'
+      elseif (index(trim(atm_data_dir),'1deg') > 0) then
+         grd = '1deg'
       else
          call abort_ice(error_message=subname//' unknown grid type')
       endif
@@ -2288,6 +2290,9 @@
          write(nu_diag,*) subname,' atm_data_dir = ',trim(atm_data_dir)
          write(nu_diag,*) subname,' atm_data_type_prefix = ',trim(atm_data_type_prefix)
          write(nu_diag,*) subname,' atm_data_version = ',trim(atm_data_version)
+         write(nu_diag,*) subname,' filename = ',trim(atm_data_dir)//                                  &
+                                    '/8XDAILY/'//trim(atm_data_type_prefix)//             &
+                                    '_03hr_forcing'//trim(atm_data_version)//'_2005.nc'
          call abort_ice(error_message=subname//' could not find forcing file')
       endif
 
@@ -4259,7 +4264,6 @@
          endif ! master_task
 
 
-
        ! Read in ocean forcing data for all 12 months
          do n=1,4    ! field loop start
             do m=1,12   ! month loop start
@@ -4279,7 +4283,7 @@
                                     field_loc_center, field_type_scalar)
                endif
 
-               if (n.eq.1) then
+               if (n == 1) then
                   ocn_frc_m(:,:,:,n,m) = work1(:,:,:) - 273.15 ! Converting from K to C
                else
                   ocn_frc_m(:,:,:,n,m) = work1(:,:,:)
@@ -4295,6 +4299,20 @@
             file=__FILE__, line=__LINE__)
 #endif
 
+
+         do m = 1, 12   ! month loop start
+            do iblk = 1, nblocks
+               do j = 1, ny_block
+                  do i = 1, nx_block
+                     ! Removing ocean velocities on land
+                     if (.not. umask(i,j,iblk)) then
+                        ocn_frc_m(i,j,iblk,3,m) = c0
+                        ocn_frc_m(i,j,iblk,4,m) = c0
+                     endif
+                  enddo
+               enddo
+            enddo
+         enddo
 
          ! ND: initialising SSS and SST
          do iblk = 1, nblocks
@@ -4314,11 +4332,25 @@
                   if (vocn(i,j,iblk) .gt. c5)  vocn(i,j,iblk) = c0 
                   if (vocn(i,j,iblk) .lt. -c5) vocn(i,j,iblk) = c0 
 
+
+                  ! if (.not. tmask(i,j,iblk)) then
+                  !    !sst(i,j,iblk)  = c0
+                  !    !sss(i,j,iblk)  = c0
+                  !    uocn(i,j,iblk) = c0
+                  !    vocn(i,j,iblk) = c0
+                  ! end if
+
+                  ! if (tmask(i,j,iblk)) then
+                     ! sst(i,j,iblk)  = c0
+                     ! sss(i,j,iblk)  = 37
+                     ! uocn(i,j,iblk) = c0
+                     ! vocn(i,j,iblk) = c0
+                  ! end if
                   ! Check that NaNs are not present
                   ! if (sst(i,j,iblk) /= sst(i,j,iblk)) sst(i,j,iblk) = Tf(i,j,iblk)
-                  if (sss(i,j,iblk) /= sss(i,j,iblk)) sss(i,j,iblk) = c0
-                  if (uocn(i,j,iblk) /= uocn(i,j,iblk)) uocn(i,j,iblk) = c0
-                  if (vocn(i,j,iblk) /= vocn(i,j,iblk)) vocn(i,j,iblk) = c0
+                  ! if (sss(i,j,iblk) /= sss(i,j,iblk)) sss(i,j,iblk) = c0
+                  ! if (uocn(i,j,iblk) /= uocn(i,j,iblk)) uocn(i,j,iblk) = c0
+                  ! if (vocn(i,j,iblk) /= vocn(i,j,iblk)) vocn(i,j,iblk) = c0
 
 
                   ! if (runtype.eq.'initial') then ! Freeze/melt is calculated within CICE
@@ -4337,6 +4369,7 @@
                enddo 
             enddo
          enddo
+         
 
 
          if (debug_forcing) then
