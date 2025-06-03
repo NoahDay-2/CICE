@@ -4319,53 +4319,20 @@
             do j = 1, ny_block
                do i = 1, nx_block
                   ! ND: 6/10/23 remove as this causes an SST Jump sst(i,j,iblk) = ocn_frc_m(i,j,iblk,1,mmonth)
+                  ! sst(i,j,iblk) = max(sst(i,j,iblk),Tf(i,j,iblk))
                   sss(i,j,iblk)  = ocn_frc_m(i,j,iblk,2,mmonth)
                   uocn(i,j,iblk) = ocn_frc_m(i,j,iblk,3,mmonth)
                   vocn(i,j,iblk) = ocn_frc_m(i,j,iblk,4,mmonth)
                   
+                  ! Ensure that SSS is not negative
                   sss(i,j,iblk) = max(sss(i,j,iblk),c0)
-                  ! sst(i,j,iblk) = max(sst(i,j,iblk),Tf(i,j,iblk))
-
-                  ! Making sure current velocities aren't unrealistic
+                  
+                  ! Ensure that current velocities aren't unrealistic
                   if (uocn(i,j,iblk) .gt. c5)  uocn(i,j,iblk) = c0 
                   if (uocn(i,j,iblk) .lt. -c5) uocn(i,j,iblk) = c0 
                   if (vocn(i,j,iblk) .gt. c5)  vocn(i,j,iblk) = c0 
                   if (vocn(i,j,iblk) .lt. -c5) vocn(i,j,iblk) = c0 
 
-
-                  ! if (.not. tmask(i,j,iblk)) then
-                  !    !sst(i,j,iblk)  = c0
-                  !    !sss(i,j,iblk)  = c0
-                  !    uocn(i,j,iblk) = c0
-                  !    vocn(i,j,iblk) = c0
-                  ! end if
-
-                  ! if (tmask(i,j,iblk)) then
-                     ! sst(i,j,iblk)  = c0
-                     ! sss(i,j,iblk)  = 37
-                     ! uocn(i,j,iblk) = c0
-                     ! vocn(i,j,iblk) = c0
-                  ! end if
-                  ! Check that NaNs are not present
-                  ! if (sst(i,j,iblk) /= sst(i,j,iblk)) sst(i,j,iblk) = Tf(i,j,iblk)
-                  ! if (sss(i,j,iblk) /= sss(i,j,iblk)) sss(i,j,iblk) = c0
-                  ! if (uocn(i,j,iblk) /= uocn(i,j,iblk)) uocn(i,j,iblk) = c0
-                  ! if (vocn(i,j,iblk) /= vocn(i,j,iblk)) vocn(i,j,iblk) = c0
-
-
-                  ! if (runtype.eq.'initial') then ! Freeze/melt is calculated within CICE
-                  !    ! Initialise to 1.0 just to begin the run
-                  !    !frzmlt(i,j,iblk) = -1.0_dbl_kind!(-1)*ocn_frc_m(i,j,iblk,1,1)
-                  !    !frzmlt(i,j,iblk) = frzmlt(i,j,iblk)
-                  !    !if (j .lt. (ny_block/4)) then
-                  !    !   frzmlt(i,j,iblk) = 1.0_dbl_kind
-                  !    !else
-                  !    !   frzmlt(i,j,iblk) = -1.0_dbl_kind
-                  !    !endif
-                  !    frzmlt(i,j,iblk) = frzmlt(i,j,iblk)
-                  ! else
-                  !    frzmlt(i,j,iblk) = frzmlt(i,j,iblk)
-                  ! endif
                enddo 
             enddo
          enddo
