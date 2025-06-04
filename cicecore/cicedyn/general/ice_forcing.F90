@@ -4246,9 +4246,9 @@
          if (my_task == master_task) then
             call ice_open_nc(sst_file, fid)
 
-            status = nf90_inq_dimid(fid,'ni',dimid)
+            status = nf90_inq_dimid(fid,'xt_ocean',dimid)
             status = nf90_inquire_dimension(fid,dimid,len=nlon)
-            status = nf90_inq_dimid(fid,'nj',dimid)
+            status = nf90_inq_dimid(fid,'yt_ocean',dimid)
             status = nf90_inquire_dimension(fid,dimid,len=nlat)
 
             if( nlon .ne. nx_global ) then
@@ -4273,11 +4273,11 @@
                !   call ice_read_nc(fid, m, vname(n), work1, debug_forcing, &
                !                    field_loc_NEcorner, field_type_vector)
                if (n == 3 .or. n == 4) then ! 2D currents
-                  ! nzlev = 1                 ! surface currents
-                  !call ice_read_nc_uv(fid, m, nzlev, vname(n), work1, debug_forcing, &
-                  !                 field_loc_NEcorner, field_type_vector)
-                  call ice_read_nc(fid, m, vname(n), work1, debug_forcing, &
-                                 field_loc_NEcorner, field_type_vector)
+                   nzlev = 1                 ! surface currents
+                  call ice_read_nc_uv(fid, m, nzlev, vname(n), work1, debug_forcing, &
+                                   field_loc_NEcorner, field_type_vector)
+                 ! call ice_read_nc(fid, m, vname(n), work1, debug_forcing, &
+                 !                field_loc_NEcorner, field_type_vector)
                else
                   call ice_read_nc(fid, m, vname(n), work1, debug_forcing, &
                                     field_loc_center, field_type_scalar)
