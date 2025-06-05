@@ -23,6 +23,7 @@ trestore        =  90
 precip_units    = 'mks'
 default_season  = 'winter'
 atm_data_type   = 'JRA55-do'
+atm_data_version = ''
 ocn_data_type   = 'access'
 atm_data_format = 'nc'
 atm_data_dir    = '/g/data/ps29/nd0349/input/CICE_data/forcing/access-om3-1deg/atmosphere/JRA55-do'
