@@ -5970,6 +5970,7 @@
       !spec_file = trim(ocn_data_dir)//'/'//trim(wave_spec_file)
       spec_file = trim(wave_spec_file)
       if (local_debug .and. my_task == master_task) write(nu_diag,*) subname, 'wave_spec_file', spec_file
+      if (local_debug .and. my_task == master_task) write(nu_diag,*) subname, 'wavefreq', wavefreq
       wave_spectrum_data = c0
       wave_spectrum = c0
       yr = fyear  ! current year
