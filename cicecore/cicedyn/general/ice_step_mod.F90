@@ -879,6 +879,11 @@
          iblk,            & ! block index
          i, j               ! horizontal indices
 
+      integer (kind=int_kind) :: & ! Noah Day: Adding for debug
+         nt_fsd,          &
+         k,               & ! index for floe sizes
+         n                  ! index for thickness
+
       character (len=char_len) :: wave_spec_type
 
       character(len=*), parameter :: subname = '(step_dyn_wave)'
@@ -902,6 +907,33 @@
 
          do j = jlo, jhi
          do i = ilo, ihi
+            ! if (my_task == master_task) then
+            ! Noah Day: Debugging wave convergence errors
+            ! if (aice(i,j,iblk) > 0.01) then
+            !    write(nu_diag,*) subname, '   DEBUG FRACTURE'
+            !    write(nu_diag,*) subname, '   wave_spec_type: ', wave_spec_type
+            !    write(nu_diag,*) subname, '   i, j, iblk', i, j, iblk
+            !    write(nu_diag,*) subname, '   aice', aice(i,j,    iblk)
+            !    write(nu_diag,*) subname, '   vice', vice(i,j,    iblk)
+            !    write(nu_diag,*) subname, '   aicen', aicen(i,j,:,  iblk)
+            !    write(nu_diag,*) subname, '   wave_spectrum', wave_spectrum(i, j, :, iblk)
+            !    write(nu_diag,*) subname, '   wavefreq', wavefreq(:)
+            !    write(nu_diag,*) subname, '   dwavefreq', dwavefreq(:)
+            !    write(nu_diag,*) subname, '   trcrn', trcrn(i, j, nt_fsd:nt_fsd+nfsd-1, :, iblk)
+            !    write(nu_diag,*) subname, '   d_afsd_wave', d_afsd_wave(i, j, :, iblk)
+            !    do n = 1, ncat
+            !       do k = 1, nfsd
+            !          if (trcrn(i, j, nt_fsd+k-1, n, iblk) < c0) then
+            !             write(nu_diag,*) subname, '   NEGATIVE ICE IN TRCRN!!!'
+            !             write(nu_diag,*) subname, '   n, k', n, k
+            !             write(nu_diag,*) subname, '   trcrn', trcrn(i, j, nt_fsd+k-1,n, iblk)
+            !             write(nu_diag,*) subname, '   Resetting ice to zero'
+            !             trcrn(i, j, nt_fsd+k-1, n, iblk) = c0
+            !          endif 
+            !       enddo ! k
+            !    enddo ! n
+            ! endif
+
             d_afsd_wave(i,j,:,iblk) = c0
             call icepack_step_wavefracture(wave_spec_type = wave_spec_type,             &
                                            dt = dt, nfreq = nfreq,                      &
