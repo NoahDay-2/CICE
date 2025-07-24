@@ -5857,7 +5857,10 @@
          wave_spectrum_profile  ! wave spectrum
 
       character(char_len) :: wave_spec_type
-      logical (kind=log_kind) :: wave_spec
+      logical (kind=log_kind) :: & 
+         wave_spec, &           ! enable waves
+         wave_propagation, &    ! enable wave propagation
+         wave_propagation_type  ! type of wave propagation
       character(len=*), parameter :: subname = '(get_wave_spec)'
 
       if (local_debug .and. my_task == master_task) write(nu_diag,*) subname,'fdbg start'
@@ -5874,6 +5877,9 @@
       wave_spectrum(:,:,:,:) = c0
       debug_forcing = .false.
 
+      ! Noah Day, Wave propagation scheme, 2025
+      wave_propagation = .true.
+
       ! wave spectrum and frequencies
       if (wave_spec) then
       ! get hardwired frequency bin info and a dummy wave spectrum profile
@@ -5888,6 +5894,10 @@
             if (trim(wave_spec_file(1:4)) == 'unkn') then
                call abort_ice (subname//'ERROR: wave_spec_file '//trim(wave_spec_file), &
                   file=__FILE__, line=__LINE__)
+
+            elseif (trim(wave_spec_file(1:5)) == 'fixed') then
+               call wave_spec_data_fixed
+               write (nu_diag,*) "ND: Using fixed wave spectrum in the open ocean"
             else
 #ifdef USE_NETCDF
                call wave_spec_data
@@ -5898,11 +5908,15 @@
                   file=__FILE__, line=__LINE__)
 #endif
             endif
-         elseif (trim(wave_spec_type) == 'fixed') then
-            call wave_spec_data_fixed
-            write (nu_diag,*) "USING FIXED WAVE SPECTRUM"
          endif
-      endif
+
+         ! ND: Wave propagation scheme
+         if (wave_propagation) then
+            call propagate_waves
+         endif
+
+      endif ! wave_spec
+
 
       call ice_timer_stop(timer_fsd)
 
@@ -6064,47 +6078,26 @@
       use ice_domain, only: nblocks, distrb_info, blocks_ice
       use ice_arrays_column, only: wave_spectrum, &
                                    dwavefreq, wavefreq
-      ! use ice_read_write, only: ice_read_nc_xyf
       use ice_grid, only: hm, tlon, tlat, tmask, umask, HTE, HTN
-      ! use ice_calendar, only: days_per_year, use_leap_years
       use ice_state, only: aice
 
       integer (kind=int_kind) :: &
-          ncid        , & ! netcdf file id
           i, j, idx_freq , & ! indices
-          pass, max_passes, & ! for propagation passes
-          dir_code, & ! directional propagation code
-          ixm,ixx,ixp , & ! record numbers for neighboring months
-          recnum      , & ! record number
-          maxrec      , & ! maximum record number
-          recslot     , & ! spline slot for current record
-          midmonth    , & ! middle day of month
-          dataloc     , & ! = 1 for data located in middle of time interval
-                          ! = 2 for date located at end of time interval
           iblk        , & ! block index
-          ilo,ihi,jlo,jhi, & ! beginning and end of physical domain
-          yr              ! current forcing year
+          ilo,ihi,jlo,jhi ! beginning and end of physical domain
 
       real (kind=dbl_kind) :: &
           sec6hr          , & ! number of seconds in 3 hours
           secday          , & ! number of seconds in day
           vmin, vmax
-         
-      ! real (kind=int_kind) :: &
-         ! nghost_tmp            ! ghost cells to search for waves
 
       logical (kind=log_kind) :: & 
-         debug_n_d, &
-         propagation, &       ! whether to propagate waves through ice
-         new_cells_updated    ! whether a new cell has received waves
+         debug_n_d
 
       type (block) :: &
          this_block           ! block information for current block
 
       real(kind=dbl_kind) :: &
-         dist,               & ! distance between cells (m)
-         exp_atten,          & ! exponential attenuation
-         conc_obs,           & ! observed ice conc from MBK (2014)
          hs_dum,             & ! dummy significant wave height (m)
          tp_dum                ! dummy peak period (s)
          ! conc                  ! conc in CICE
@@ -6116,33 +6109,10 @@
          wave_spectrum_data,   & ! default values for nfreq profile
          attenuation_rate
 
-      logical (kind=log_kind), dimension(nx_block,ny_block,nblocks) :: &
-         ocean_mask, & ! mask for open ocean
-         has_waves ! mask for presence of waves
-
-      integer, dimension(4) :: di = [0,  0, -1, 1]  ! N, S, W, E
-      integer, dimension(4) :: dj = [1, -1,  0, 0]
-      integer, dimension(4) :: dir_code_list = [1, 3, 4, 2]  ! Example direction codes
-
-      real(kind=dbl_kind) :: delta_lat, max_delta_lat
-      integer :: best_in, best_jn, best_dir, i_n, j_n, idx_d
-
-
-
-      character(len=64) :: fieldname !netcdf field name
-      character(char_len_long) :: spec_file
-      character(char_len) :: wave_spec_type
-      logical (kind=log_kind) :: wave_spec
-      character(len=*), parameter :: subname = '(wave_spec_data)'
-
-      ! TODO
-      ! - 
 
       ! Parameters:
       hs_dum = 4.0_dbl_kind    ! SWH used to define spectrum
       tp_dum = 10.0_dbl_kind   ! peak period used to define spectrum
-      conc_obs = 0.70_dbl_kind ! aice observed in MBK (2014)
-      propagation = .true.     ! whether to propagate waves through ice
 
       ! Initialise spectrum
       wave_spectrum_data(:) = c0
@@ -6150,19 +6120,10 @@
          wave_spectrum_data(idx_freq) =  SDF_Bretschneider(wavefreq(idx_freq), 0, hs_dum, tp_dum)
       enddo
 
-      ! Meylan, Bennetts, Kohout, GRL (2014) empirical attenuation
-      do idx_freq = 1, nfreq
-         attenuation_rate(idx_freq) = fn_Attn_MBK(wavefreq(idx_freq))/conc_obs
-         ! attenuation_rate(idx_freq) = c0
-      enddo
-
       debug_n_d = .false.  !usually false
+      wave_spectrum(:,:,:,:) = c0 ! Initially set wave spectrum to zero
 
-      ! allocate(ocean_mask(nx_block, ny_block, nblocks))
-      ocean_mask(:,:,:) = .false. ! Initially set open ocean to false globally
-      has_waves(:,:,:) = .false. ! Initially set no waves globally
-
-      ! Calculate a mask for the open ocean
+      ! Calculate a mask for the open ocean and apply waves throughout
       do iblk = 1, nblocks
          this_block = get_block(blocks_ice(iblk),iblk)
          ilo = this_block%ilo
@@ -6172,204 +6133,173 @@
          do j = jlo, jhi
             do i = ilo, ihi
                if (aice(i, j, iblk) < 0.15_dbl_kind .and. tmask(i, j, iblk)) then
-                  ocean_mask(i, j, iblk) = .true.   ! open ocean
-               endif
-            enddo
-         enddo
-      enddo
-
-
-      ! ! No ocean in the ghost cells
-      ! do iblk = 1, nblocks
-      !    this_block = get_block(blocks_ice(iblk),iblk)
-      !    ilo = this_block%ilo
-      !    ihi = this_block%ihi
-      !    jlo = this_block%jlo
-      !    jhi = this_block%jhi
-
-      !    ! needs to cover halo (no halo update for logicals)
-      !    do j = jlo-nghost, jhi+nghost
-      !    do i = ilo-nghost, ihi+nghost
-      !       ! if ( hm(i,j,iblk)   > p5  ) tmask  (i,j,iblk)   = .true.
-      !       ! if (aice(i, j, iblk) < 0.15_dbl_kind .and. tmask(i, j, iblk)) then
-      !       ocean_mask(i, j, iblk) = .false.   ! open ocean
-      !       ! endif
-      !    enddo
-      !    enddo
-      ! enddo
-
-
-      ! Apply waves to the open ocean and ice-covered regions
-      do iblk = 1, nblocks
-         do j = 1, ny_block
-            do i = 1, nx_block
-               if (ocean_mask(i, j, iblk)) then
-                  ! Apply wave forcing for open ocean (nx_block,ny_block,nfreq,nblocks)   
                   wave_spectrum(i, j, :, iblk) = wave_spectrum_data
-                  has_waves(i, j, iblk) = .true. 
-               else
-                  ! Apply wave forcing for ice-covered regions
-                  wave_spectrum(i, j, :, iblk) = c0  ! No waves under ice
                endif
             enddo
          enddo
       enddo
-
-   !!! Wave propagation through ice-covered regions
-   ! Prioritisation inspired from Fraser et al. (2025) Fig. 2: 
-   ! dir_codes: 
-   !   1. From the west cell 
-   !   2. From the north-west cell 
-   !   3. From the north cell
-   !   4. From the north-east cell
-   !   5. From the east cell
-   !   6. From the south-east cell
-   !   7. From the south-west cell
-   !   8. From the south cell
-   !
-   ! NB. Cornering cells are included
-   max_passes = 10
-   if (propagation) then
-      if (debug_n_d .and. my_task == master_task) write(nu_diag,*) subname, ' propagating waves through ice'
-      if (debug_n_d .and. my_task == master_task) write(nu_diag,*) subname, ' max_passes', max_passes
-
-      do pass = 1, max_passes
-         if (debug_n_d .and. my_task == master_task) write(nu_diag,*) subname, ' pass: ', pass
-         new_cells_updated = .false.
-
-         do iblk = 1, nblocks
-            this_block = get_block(blocks_ice(iblk),iblk)
-            ilo = this_block%ilo
-            ihi = this_block%ihi
-            jlo = this_block%jlo
-            jhi = this_block%jhi
-            do j = jlo, jhi
-               do i = ilo, ihi
-                  if (.not. ocean_mask(i, j, iblk) .and. .not. has_waves(i, j, iblk)) then
-                     ! Then we are in a ice-free, wave-free cell
-
-                     max_delta_lat = -1.0_dbl_kind
-                     best_in = i
-                     best_jn = j
-                     best_dir = -1
-
-                     do idx_d = 1, 4
-                        i_n = i + di(idx_d)
-                        j_n = j + dj(idx_d)
-
-                        if (i_n >= ilo .and. i_n <= ihi .and. j_n >= jlo .and. j_n <= jhi) then
-                           if (has_waves(i_n, j_n, iblk)) then
-                              delta_lat = ABS(TLAT(i_n, j_n, iblk) - TLAT(i, j, iblk))
-
-                              if (delta_lat > max_delta_lat) then
-                                 max_delta_lat = delta_lat
-                                 best_in = i_n
-                                 best_jn = j_n
-                                 best_dir = dir_code_list(idx_d)
-                              end if
-                           end if
-                        end if
-                     end do
-
-                     ! Now propagate only if there was a meaningful increase in TLAT
-                     if (max_delta_lat > 0.0_dbl_kind) then
-                        call propagate_wave(i, j, iblk, best_in, best_jn, iblk, aice(best_in, best_jn, iblk), &
-                           best_dir, attenuation_rate, wave_spectrum)
-                        new_cells_updated = .true.
-                        has_waves(i, j, iblk) = .true.
-                     end if
-
-
-
-
-
-
-                     ! ! 1. From west (W)
-                     ! if (i > 1 .and. has_waves(i-1, j, iblk)) then
-                     !    dir_code = 1
-                     !    call propagate_wave(i, j, iblk, i-1, j, iblk, aice(i-1, j, iblk), &
-                     !       dir_code, attenuation_rate, wave_spectrum)
-                     !    new_cells_updated = .true.
-                     !    has_waves(i, j, iblk) = .true. 
-
-                     ! ! 2. From northwest (NW)
-                     ! elseif (i > 1 .and. j < ny_block .and. has_waves(i-1, j+1, iblk)) then
-                     !    dir_code = 2
-                     !    call propagate_wave(i, j, iblk, i-1, j+1, iblk, aice(i-1, j+1, iblk), &
-                     !       dir_code, attenuation_rate, wave_spectrum)
-                     !    new_cells_updated = .true.
-                     !    has_waves(i, j, iblk) = .true. 
-
-                     ! ! 3. From north (N)
-                     ! if (j < jhi .and. has_waves(i, j+1, iblk)) then
-                     !    dir_code = 3
-                     !    call propagate_wave(i, j, iblk, i, j+1, iblk, aice(i, j+1, iblk), &
-                     !       dir_code, attenuation_rate, wave_spectrum)
-                     !    new_cells_updated = .true.
-                     !    has_waves(i, j, iblk) = .true. 
-
-                     ! ! 4. From northeast (NE)
-                     ! elseif (i < nx_block .and. j < ny_block .and. has_waves(i+1, j+1, iblk)) then
-                     !    dir_code = 4
-                     !    call propagate_wave(i, j, iblk, i+1, j+1, iblk, aice(i+1, j+1, iblk), &
-                     !       dir_code, attenuation_rate, wave_spectrum)
-                     !    new_cells_updated = .true.
-                     !    has_waves(i, j, iblk) = .true. 
-
-                     ! ! 5. From east (E)
-                     ! elseif (i < nx_block .and. has_waves(i+1, j, iblk)) then
-                     !    dir_code = 5
-                     !    call propagate_wave(i, j, iblk, i+1, j, iblk, aice(i+1, j, iblk), &
-                     !       dir_code, attenuation_rate, wave_spectrum)
-                     !    new_cells_updated = .true.
-                     !    has_waves(i, j, iblk) = .true. 
-
-                     ! ! 6. From southeast (SE)
-                     ! elseif (i < nx_block .and. j > 1 .and. has_waves(i+1, j-1, iblk)) then
-                     !    dir_code = 6
-                     !    call propagate_wave(i, j, iblk, i+1, j-1, iblk, aice(i+1, j-1, iblk), &
-                     !       dir_code, attenuation_rate, wave_spectrum)
-                     !    new_cells_updated = .true.
-                     !    has_waves(i, j, iblk) = .true. 
-
-                     ! ! 7. From southwest (SW)
-                     ! elseif (i > 1 .and. j > 1 .and. has_waves(i-1, j-1, iblk)) then
-                     !    dir_code = 7
-                     !    call propagate_wave(i, j, iblk, i-1, j-1, iblk, aice(i-1, j-1, iblk), &
-                     !       dir_code, attenuation_rate, wave_spectrum)
-                     !    new_cells_updated = .true.
-                     !    has_waves(i, j, iblk) = .true. 
-
-                     ! ! 8. From south (S)
-                     ! elseif (j > jlo .and. has_waves(i, j-1, iblk)) then
-                     !    dir_code = 8
-                     !    call propagate_wave(i, j, iblk, i, j-1, iblk, aice(i, j-1, iblk), &
-                     !       dir_code, attenuation_rate, wave_spectrum)
-                     !    new_cells_updated = .true.
-                     !    has_waves(i, j, iblk) = .true. 
-
-                     ! endif
-                  endif
-               enddo
-            enddo
-         enddo ! blocks
-
-         if (.not. new_cells_updated) exit
-      enddo ! pass
-
-   endif ! propagation
 
 
       end subroutine wave_spec_data_fixed
 
 !=======================================================================
-!   ROUTINE: propagate_wave
+!   ROUTINE: propagate_waves
 !
-!   DESCRIPTION: Propagate waves through ice-covered regions
+!   DESCRIPTION: Propagate waves across the ice cover
 !
 !   Noah Day, University of Adelaide, 2025
 !
-      subroutine propagate_wave(i, j, iblk, src_i, src_j, src_iblk, conc, dir_code, attenuation_rate, wave_spectrum)
+      subroutine propagate_waves
+
+      use ice_grid, only: HTE, HTN, tlat, tlon
+      use ice_domain, only: nblocks, distrb_info, blocks_ice
+      use ice_blocks, only: block, get_block, nx_block, ny_block, nghost
+      use ice_arrays_column, only: wave_spectrum, &
+                                   dwavefreq, wavefreq
+      use ice_grid, only: hm, tlon, tlat, tmask, umask, HTE, HTN
+      use ice_state, only: aice
+
+      type (block) :: &
+         this_block           ! block information for current block
+
+      real(kind=dbl_kind), dimension(nfreq) :: &
+         attenuation_rate
+
+      logical (kind=log_kind) :: & 
+         debug_n_d, &
+         wave_spec, &
+         propagation, &       ! whether to propagate waves through ice
+         new_cells_updated    ! whether a new cell has received waves
+
+      real(kind=dbl_kind) :: &
+         delta_lat,          & ! local delta latitude (rad)
+         max_delta_lat,      & ! maximum delta latitude (rad)
+         local_sig_ht,       & ! local significant wave height (m)       
+         neighbour_sig_ht,   & ! significant wave height of neighbours (m)       
+         dist,               & ! distance between cells (m)
+         exp_atten,          & ! exponential attenuation
+         conc_obs              ! observed ice conc from MBK (2014)
+
+      integer (kind=int_kind) :: &
+          i, j, idx_freq , & ! indices
+          pass, max_passes, & ! for propagation passes
+          dir_code, & ! directional propagation code
+          iblk        , & ! block index
+          ilo,ihi,jlo,jhi, &  ! beginning and end of physical domain
+          best_in, best_jn, best_dir, i_n, j_n, idx_d
+
+      integer, dimension(4) :: di = [0,  0, -1, 1]  ! N, S, W, E
+      integer, dimension(4) :: dj = [1, -1,  0, 0]
+      integer, dimension(4) :: dir_code_list = [1, 3, 4, 2]  ! Example direction codes
+
+
+      character(len=*), parameter :: subname = '(propagate_waves)'
+
+   ! Parameters:
+   debug_n_d = .true.  !usually false
+   conc_obs = 0.70_dbl_kind ! aice observed in MBK (2014)
+
+   ! Meylan, Bennetts, Kohout, GRL (2014) empirical attenuation
+   do idx_freq = 1, nfreq
+      attenuation_rate(idx_freq) = fn_Attn_MBK(wavefreq(idx_freq))/conc_obs
+   enddo
+
+
+   ! NB. Cornering cells are included
+   max_passes = 10
+   if (debug_n_d .and. my_task == master_task) write(nu_diag,*) subname, ' propagating waves through ice'
+   if (debug_n_d .and. my_task == master_task) write(nu_diag,*) subname, ' max_passes', max_passes
+
+   ! Remove all the wave energy from the ice cells
+   do iblk = 1, nblocks
+         this_block = get_block(blocks_ice(iblk),iblk)
+         ilo = this_block%ilo
+         ihi = this_block%ihi
+         jlo = this_block%jlo
+         jhi = this_block%jhi
+         do j = jlo, jhi
+            do i = ilo, ihi
+               ! Check that we are in a cell that has ice
+               if (.not. (aice(i, j, iblk) < 0.15_dbl_kind .and. tmask(i, j, iblk))) then
+                  ! Initialise all ice-covered cells to be wave-free
+                  wave_spectrum(i, j, :, iblk) = c0
+               endif
+            enddo ! i
+         enddo ! j
+      enddo ! blocks 
+
+   do pass = 1, max_passes
+      if (debug_n_d .and. my_task == master_task) write(nu_diag,*) subname, ' pass: ', pass
+      new_cells_updated = .false.
+
+      do iblk = 1, nblocks
+         this_block = get_block(blocks_ice(iblk),iblk)
+         ilo = this_block%ilo
+         ihi = this_block%ihi
+         jlo = this_block%jlo
+         jhi = this_block%jhi
+         do j = jlo, jhi
+            do i = ilo, ihi
+               ! Check that we are in a cell that has ice
+               local_sig_ht = c4*SQRT(SUM(wave_spectrum(i, j, :, iblk)*dwavefreq(:)))
+               if (.not. (aice(i, j, iblk) < 0.15_dbl_kind .and. tmask(i, j, iblk) .and. local_sig_ht>p1)) then
+                  ! Then we are in a ice-free, wave-free cell
+
+                  max_delta_lat = -c1 ! Chosen quite arbitrarily, but must be negative
+                  best_in = i
+                  best_jn = j
+                  best_dir = -1
+
+                  do idx_d = 1, 4
+                     i_n = i + di(idx_d)
+                     j_n = j + dj(idx_d)
+
+                     neighbour_sig_ht = c4*SQRT(SUM(wave_spectrum(i_n, j_n, :, iblk)*dwavefreq(:)))
+
+                     if (i_n >= ilo .and. i_n <= ihi .and. j_n >= jlo .and. j_n <= jhi) then
+                        if (neighbour_sig_ht > p1) then
+                           ! Threshold for significant wave height consistent with 
+                           ! icepack_step_wavefracture
+                           delta_lat = ABS(TLAT(i_n, j_n, iblk) - TLAT(i, j, iblk))
+
+                           if (delta_lat > max_delta_lat) then
+                              max_delta_lat = delta_lat
+                              best_in = i_n
+                              best_jn = j_n
+                              best_dir = dir_code_list(idx_d)
+
+                           end if ! delta_lat
+                        end if ! local_sig_ht
+                     end if ! i_n, j_n within bounds
+                  end do
+
+                  ! Now propagate only if there was a meaningful increase in TLAT
+                  if (max_delta_lat > c0) then
+                     call increment_wave(i, j, iblk, best_in, best_jn, iblk, aice(best_in, best_jn, iblk), &
+                        best_dir, attenuation_rate, wave_spectrum)
+                     new_cells_updated = .true.
+
+                  end if
+
+               endif
+            enddo ! i
+         enddo ! j
+      enddo ! blocks
+      ! If no cells were updated in this pass, exit
+      if (.not. new_cells_updated) exit
+   enddo ! pass
+
+
+      end subroutine propagate_waves
+
+!=======================================================================
+!   ROUTINE: increment_wave
+!
+!   DESCRIPTION: Propagate waves from one location to another
+!
+!   Noah Day, University of Adelaide, 2025
+!
+      subroutine increment_wave(i, j, iblk, src_i, src_j, src_iblk, conc, dir_code, attenuation_rate, wave_spectrum)
 
       use ice_grid, only: HTE, HTN, tlat, tlon
 
@@ -6402,7 +6332,7 @@
       logical (kind=log_kind) :: & 
          debug_n_d
 
-      character(len=*), parameter :: subname = '(propagate_wave)'
+      character(len=*), parameter :: subname = '(increment_wave)'
 
 
       debug_n_d = .false.  !usually false
@@ -6439,7 +6369,7 @@
          write(nu_diag,*) subname, '   LAT', tlat(src_i, src_j, iblk) * (180.0d0 / acos(-1.0d0)), ' LON', tlon(src_i, src_j, iblk) * (180.0d0 / acos(-1.0d0))
       endif
 
-      end subroutine propagate_wave
+      end subroutine increment_wave
 
 !=======================================================================
 !   FUNCTION: SDF_Bretschneider_freq

@@ -1,8 +1,8 @@
 dt = 3600.0
 runtype = 'initial'
-year_init      = 1900
-use_leap_years = .false.
-use_restart_time = .false.
+year_init      = 1958
+use_leap_years = .true.
+use_restart_time = .true.
 
 
 ice_ic  = '/g/data/ps29/nd0349/input/CICE_data/forcing/access-om3-1deg/initial_conditions/2023.07.28/iced.1900-01-01-10800-sst.nc'
@@ -16,8 +16,13 @@ nx_global         = 360
 ny_global         = 300
 block_size_x      = 90
 block_size_y      = 75
+processor_shape   = 'slenderX1'
+ew_boundary_type  = 'cyclic'
+ns_boundary_type  = 'tripole'
+
 nilyr        = 4
 
+oceanmixed_ice  = .true.
 restore_ocn     = .true.
 trestore        =  90
 precip_units    = 'mks'
@@ -25,6 +30,7 @@ default_season  = 'winter'
 atm_data_type   = 'JRA55-do'
 atm_data_version = ''
 ocn_data_type   = 'access'
+fyear_init      = 1958
 atm_data_format = 'nc'
 atm_data_dir    = '/g/data/ps29/nd0349/input/CICE_data/forcing/access-om3-1deg/atmosphere/JRA55-do'
 ocn_data_format = 'nc'
