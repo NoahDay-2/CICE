@@ -4202,6 +4202,7 @@
 
       integer (kind=int_kind) :: &
          i, j, iblk       , & ! horizontal indices
+         modadj           , & ! adjustment to make mod a postive number
          fid                  ! file id for netCDF file
 
       character (char_len) :: &
@@ -4232,12 +4233,29 @@
         !---------------------------------------------------------------
         ! Read in ocean forcing data from an existing file
         !---------------------------------------------------------------
-        write (nu_diag,*) 'ocean mixed layer forcing data file = ', &
+         write (nu_diag,*) 'ocean mixed layer forcing data file = ', &
                            trim(sst_file)
-         write (nu_diag,*) 'FILE YEAR:', myear
-        call file_year(sst_file, myear)
-        write (nu_diag,*) 'ocean mixed layer forcing data file = ', &
+         ! write (nu_diag,*) 'FILE YEAR:', myear
+
+         modadj      = abs((min(0,myear-fyear_init)/ycycle+1)*ycycle)
+         fyear       = fyear_init + mod(myear-fyear_init+modadj,ycycle)
+         fyear_final = fyear_init + ycycle - 1 ! last year in forcing cycle
+
+         if (local_debug .and. my_task == master_task) then
+            write(nu_diag,*) subname,'fdbg fyear = ',fyear,fyear_init,fyear_final
+            write(nu_diag,*) subname,'fdbg ocn_data_type = ',trim(ocn_data_type)
+         endif
+
+         if (trim(ocn_data_type) /= 'default' .and. &
+                           my_task == master_task) then
+            write (nu_diag,*) ' Initial forcing data year = ',fyear_init
+            write (nu_diag,*) ' Final   forcing data year = ',fyear_final
+         endif
+
+         call file_year(sst_file, fyear)
+         write (nu_diag,*) 'ocean mixed layer forcing data file = ', &
                            trim(sst_file)
+
 
       endif ! master_task
 
