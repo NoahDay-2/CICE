@@ -1,4 +1,4 @@
 [submodule "icepack"]
 	path = icepack
 	url = https://github.com/NoahDay-2/Icepack
-	branch = wave-forcing
+	branch = ice-fracture
